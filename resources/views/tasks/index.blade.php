@@ -1,201 +1,141 @@
-@extends('layouts.app')
+@extends('layouts.app', ['header' => 'Task Board', 'subheader' => 'Fast, focused workspace with live updates'])
+
+@push('styles')
+<style>
+  .dashboard-hero {
+    background: linear-gradient(130deg, #0d1f2a 0%, #134e4a 62%, #0f766e 100%);
+    color: #f4fffc;
+    border-radius: 18px;
+    padding: 20px;
+  }
+  .hero-chip {
+    background: rgba(255, 255, 255, .18);
+    border: 1px solid rgba(255, 255, 255, .22);
+    border-radius: 999px;
+    font-size: 12px;
+    padding: 4px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .metric-card {
+    border: 1px solid rgba(18, 36, 42, .08);
+    border-radius: 14px;
+    background: #fff;
+    padding: 14px;
+  }
+  .metric-label { color: #5e6f75; font-size: 12px; }
+  .metric-value { font-size: 26px; font-weight: 800; line-height: 1; }
+  .toolbar-card {
+    border: 1px solid rgba(18, 36, 42, .08);
+    border-radius: 14px;
+    background: #fff;
+    padding: 14px;
+  }
+  .tab-btn {
+    border: 1px solid rgba(18, 36, 42, .12);
+    background: #fff;
+    color: #20323a;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-weight: 700;
+  }
+  .tab-btn.active {
+    background: #0f766e;
+    color: #fff;
+    border-color: #0f766e;
+  }
+  .table-wrap {
+    border: 1px solid rgba(18, 36, 42, .08);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, .72);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+  }
+  .loading-overlay.show { display: flex; }
+</style>
+@endpush
 
 @section('content')
-@php
-  $from = $tasks->firstItem() ?? 0;
-  $to = $tasks->lastItem() ?? 0;
-@endphp
-
-<div class="row g-4">
-  <div class="col-12">
-    <div class="card shadow-sm">
-      <div class="card-body p-4">
-        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
-          <div>
-            <div class="h5 mb-0 fw-bold">Tasks</div>
-            <div class="text-muted small">Simple, fast workflow for managing your todos.</div>
-          </div>
-          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">+ New Task</button>
-        </div>
-
-        <ul class="nav nav-pills mb-3 gap-2" role="tablist">
-          <li class="nav-item">
-            <a class="nav-link @if($tab === 'all') active @endif" href="{{ route('tasks.index', array_merge(request()->query(), ['tab' => 'all', 'status' => ''])) }}">
-              All <span class="badge text-bg-light ms-1">{{ $counts['all'] }}</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link @if($tab === 'pending') active @endif" href="{{ route('tasks.index', array_merge(request()->query(), ['tab' => 'pending', 'status' => ''])) }}">
-              Pending <span class="badge text-bg-light ms-1">{{ $counts['pending'] }}</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link @if($tab === 'done') active @endif" href="{{ route('tasks.index', array_merge(request()->query(), ['tab' => 'done', 'status' => ''])) }}">
-              Done <span class="badge text-bg-light ms-1">{{ $counts['done'] }}</span>
-            </a>
-          </li>
-        </ul>
-
-        <form id="filtersForm" class="row g-2 mb-3" method="GET" action="{{ route('tasks.index') }}">
-          <input type="hidden" name="tab" value="{{ $tab }}">
-
-          <div class="col-12 col-md-4">
-            <input id="searchInput" type="text" name="q" value="{{ $q }}" class="form-control" placeholder="Search title, notes, description...">
-          </div>
-
-          <div class="col-6 col-md-3">
-            <select id="statusFilter" name="status" class="form-select">
-              <option value="" @selected($status === '')>All Status</option>
-              <option value="pending" @selected($status==='pending')>Pending</option>
-              <option value="done" @selected($status==='done')>Done</option>
-            </select>
-          </div>
-
-          <div class="col-6 col-md-2">
-            <select id="perPageFilter" name="per_page" class="form-select">
-              @foreach([10,25,50] as $n)
-                <option value="{{ $n }}" @selected($perPage===$n)>{{ $n }} / page</option>
-              @endforeach
-            </select>
-          </div>
-
-          <div class="col-12 col-md-3 d-flex gap-2">
-            <button class="btn btn-outline-primary w-100" type="submit">Apply</button>
-            <a class="btn btn-outline-secondary w-100" href="{{ route('tasks.index', ['clear' => 1]) }}">Clear</a>
-          </div>
-        </form>
-
-        @if($tasks->count())
-          <form id="bulkForm" method="POST" action="{{ route('tasks.bulk-action') }}">
-            @csrf
-
-            <div class="d-flex flex-wrap gap-2 mb-3">
-              <select name="bulk_action" class="form-select" style="max-width: 220px;" required>
-                <option value="">Bulk action...</option>
-                <option value="mark_done">Mark Done</option>
-                <option value="delete">Delete</option>
-              </select>
-              <button class="btn btn-outline-dark" type="submit">Apply to Selected</button>
-            </div>
-
-            <div class="table-responsive">
-              <table class="table table-hover align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <th style="width: 40px;"><input type="checkbox" id="selectAll"></th>
-                    <th style="width: 60px;">#</th>
-                    <th>Task</th>
-                    <th style="width: 150px;">Priority</th>
-                    <th style="width: 140px;">Due Date</th>
-                    <th style="width: 130px;">Status</th>
-                    <th style="width: 280px;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @foreach($tasks as $task)
-                    <tr>
-                      <td><input class="task-checkbox" type="checkbox" name="task_ids[]" value="{{ $task->id }}"></td>
-                      <td class="text-muted">{{ $task->id }}</td>
-                      <td>
-                        <div class="fw-semibold">{{ $task->title }}</div>
-                        <div class="text-muted small">{{ \Illuminate\Support\Str::limit($task->notes ?: $task->description, 90) }}</div>
-                      </td>
-                      <td>
-                        @if($task->priority === 'high')
-                          <span class="badge badge-priority-high">High</span>
-                        @elseif($task->priority === 'medium')
-                          <span class="badge badge-priority-medium">Medium</span>
-                        @else
-                          <span class="badge badge-priority-low">Low</span>
-                        @endif
-                      </td>
-                      <td>
-                        @if($task->due_date)
-                          <span class="badge badge-soft">{{ $task->due_date->format('Y-m-d') }}</span>
-                        @else
-                          <span class="text-muted small">No date</span>
-                        @endif
-                      </td>
-                      <td>
-                        @if($task->status === 'done')
-                          <span class="badge badge-done">Done</span>
-                        @else
-                          <span class="badge badge-pending">Pending</span>
-                        @endif
-                      </td>
-                      <td>
-                        <div class="d-flex flex-wrap gap-2">
-                          <form method="POST" action="{{ route('tasks.status', $task) }}">
-                            @csrf
-                            @method('PATCH')
-                            <input type="hidden" name="status" value="{{ $task->status === 'done' ? 'pending' : 'done' }}" class="status-value">
-                            <div class="form-check form-switch m-0">
-                              <input class="form-check-input quick-status-toggle" type="checkbox" @checked($task->status === 'done')>
-                            </div>
-                          </form>
-
-                          <form method="POST" action="{{ route('tasks.status', $task) }}">
-                            @csrf
-                            @method('PATCH')
-                            <input type="hidden" name="status" value="done">
-                            <button class="btn btn-sm btn-outline-success" type="submit">Mark Done</button>
-                          </form>
-
-                          <form method="POST" action="{{ route('tasks.status', $task) }}">
-                            @csrf
-                            @method('PATCH')
-                            <input type="hidden" name="status" value="pending">
-                            <button class="btn btn-sm btn-outline-warning" type="submit">Mark Pending</button>
-                          </form>
-
-                          <a class="btn btn-sm btn-outline-secondary" href="{{ route('tasks.show', $task) }}">View</a>
-
-                          <button
-                            class="btn btn-sm btn-outline-primary btn-edit"
-                            data-bs-toggle="modal"
-                            data-bs-target="#editModal"
-                            data-id="{{ $task->id }}"
-                            data-title="{{ e($task->title) }}"
-                            data-description="{{ e($task->description) }}"
-                            data-notes="{{ e($task->notes) }}"
-                            data-status="{{ $task->status }}"
-                            data-priority="{{ $task->priority }}"
-                            data-due-date="{{ optional($task->due_date)->format('Y-m-d') }}"
-                            data-update-url="{{ route('tasks.update', $task) }}"
-                          >
-                            Edit
-                          </button>
-
-                          <form method="POST" action="{{ route('tasks.destroy', $task) }}" class="form-delete">
-                            @csrf
-                            @method('DELETE')
-                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                  @endforeach
-                </tbody>
-              </table>
-            </div>
-          </form>
-        @else
-          <div class="text-center py-5 border rounded-3 bg-light-subtle">
-            <div class="h6 mb-1">No tasks found</div>
-            <p class="text-muted mb-3">Start by creating your first task or clear filters.</p>
-            <div class="d-flex justify-content-center gap-2">
-              <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">Create Task</button>
-              <a class="btn btn-outline-secondary" href="{{ route('tasks.index', ['clear' => 1]) }}">Clear Filters</a>
-            </div>
-          </div>
-        @endif
-
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-          <div class="text-muted small">Showing {{ $from }}-{{ $to }} of {{ $tasks->total() }}</div>
-          <div>{{ $tasks->links() }}</div>
-        </div>
-      </div>
+<div class="dashboard-hero mb-3 mb-lg-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div>
+      <div class="hero-chip mb-2">Private Workspace</div>
+      <h2 class="h4 mb-1 text-white">Your tasks, streamlined</h2>
+      <p class="mb-0 opacity-75 small">AJAX filters, quick actions, and clean organization without page reloads.</p>
     </div>
+    <button class="btn btn-light fw-semibold" data-bs-toggle="modal" data-bs-target="#createModal">+ New Task</button>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-md-4">
+    <div class="metric-card">
+      <div class="metric-label mb-1">All Tasks</div>
+      <div id="count-all" class="metric-value">{{ $counts['all'] }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="metric-card">
+      <div class="metric-label mb-1">Pending</div>
+      <div id="count-pending" class="metric-value">{{ $counts['pending'] }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="metric-card">
+      <div class="metric-label mb-1">Done</div>
+      <div id="count-done" class="metric-value">{{ $counts['done'] }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="toolbar-card mb-3">
+  <div class="d-flex flex-wrap gap-2 mb-3" id="taskTabs">
+    <button class="tab-btn @if($tab === 'all') active @endif" type="button" data-tab="all">All</button>
+    <button class="tab-btn @if($tab === 'pending') active @endif" type="button" data-tab="pending">Pending</button>
+    <button class="tab-btn @if($tab === 'done') active @endif" type="button" data-tab="done">Done</button>
+  </div>
+
+  <form id="filtersForm" class="row g-2 align-items-center">
+    <input type="hidden" name="tab" value="{{ $tab }}">
+    <div class="col-12 col-md-5">
+      <input id="searchInput" type="text" name="q" value="{{ $q }}" class="form-control" placeholder="Search by title, notes, description...">
+    </div>
+    <div class="col-6 col-md-3">
+      <select id="statusFilter" name="status" class="form-select">
+        <option value="" @selected($status === '')>All Status</option>
+        <option value="pending" @selected($status==='pending')>Pending</option>
+        <option value="done" @selected($status==='done')>Done</option>
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <select id="perPageFilter" name="per_page" class="form-select">
+        @foreach([10,25,50] as $n)
+          <option value="{{ $n }}" @selected($perPage===$n)>{{ $n }}/page</option>
+        @endforeach
+      </select>
+    </div>
+    <div class="col-12 col-md-2 d-grid">
+      <button id="clearBtn" class="btn btn-outline-secondary" type="button">Clear</button>
+    </div>
+  </form>
+</div>
+
+<div class="position-relative table-wrap">
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner-border text-success" role="status"></div>
+  </div>
+
+  <div id="tasksContent" class="p-3">
+    @include('tasks.partials.table')
   </div>
 </div>
 
@@ -204,63 +144,55 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">Create Task</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
 
-      <form method="POST" action="{{ route('tasks.store') }}">
+      <form id="createTaskForm" method="POST" action="{{ route('tasks.store') }}">
         @csrf
         <div class="modal-body">
-          @if($errors->any() && !old('edit_task_id'))
-            <div class="alert alert-danger py-2">
-              <ul class="mb-0 ps-3">
-                @foreach($errors->all() as $err)
-                  <li>{{ $err }}</li>
-                @endforeach
-              </ul>
-            </div>
-          @endif
+          <div id="createErrors" class="alert alert-danger d-none py-2"></div>
 
           <div class="mb-3">
             <label class="form-label">Title</label>
-            <input name="title" class="form-control" value="{{ old('title') }}" required>
+            <input name="title" class="form-control" required>
           </div>
 
           <div class="row g-3 mb-3">
             <div class="col-md-4">
               <label class="form-label">Priority</label>
               <select name="priority" class="form-select" required>
-                <option value="low" @selected(old('priority') === 'low')>Low</option>
-                <option value="medium" @selected(old('priority', 'medium') === 'medium')>Medium</option>
-                <option value="high" @selected(old('priority') === 'high')>High</option>
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
               </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">Due Date</label>
-              <input type="date" name="due_date" class="form-control" value="{{ old('due_date') }}">
+              <input type="date" name="due_date" class="form-control">
             </div>
             <div class="col-md-4">
               <label class="form-label">Status</label>
               <select name="status" class="form-select" required>
-                <option value="pending" @selected(old('status', 'pending') === 'pending')>Pending</option>
-                <option value="done" @selected(old('status') === 'done')>Done</option>
+                <option value="pending" selected>Pending</option>
+                <option value="done">Done</option>
               </select>
             </div>
           </div>
 
           <div class="mb-3">
             <label class="form-label">Notes</label>
-            <textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea>
+            <textarea name="notes" class="form-control" rows="3"></textarea>
           </div>
 
           <div class="mb-0">
             <label class="form-label">Description</label>
-            <textarea name="description" class="form-control" rows="3">{{ old('description') }}</textarea>
+            <textarea name="description" class="form-control" rows="3"></textarea>
           </div>
         </div>
 
         <div class="modal-footer">
           <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
-          <button class="btn btn-primary" type="submit">Save</button>
+          <button class="btn btn-dark" type="submit">Save</button>
         </div>
       </form>
     </div>
@@ -272,68 +204,57 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">Edit Task</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
 
-      <form id="editForm" method="POST" action="{{ old('edit_update_url', '#') }}">
+      <form id="editTaskForm" method="POST" action="#">
         @csrf
         @method('PUT')
 
-        <input type="hidden" id="editTaskId" name="edit_task_id" value="{{ old('edit_task_id') }}">
-        <input type="hidden" id="editUpdateUrl" name="edit_update_url" value="{{ old('edit_update_url') }}">
-
         <div class="modal-body">
-          @if($errors->any() && old('edit_task_id'))
-            <div class="alert alert-danger py-2">
-              <ul class="mb-0 ps-3">
-                @foreach($errors->all() as $err)
-                  <li>{{ $err }}</li>
-                @endforeach
-              </ul>
-            </div>
-          @endif
+          <div id="editErrors" class="alert alert-danger d-none py-2"></div>
 
           <div class="mb-3">
             <label class="form-label">Title</label>
-            <input id="editTitle" name="title" class="form-control" value="{{ old('title') }}" required>
+            <input id="editTitle" name="title" class="form-control" required>
           </div>
 
           <div class="row g-3 mb-3">
             <div class="col-md-4">
               <label class="form-label">Priority</label>
               <select id="editPriority" name="priority" class="form-select" required>
-                <option value="low" @selected(old('priority') === 'low')>Low</option>
-                <option value="medium" @selected(old('priority', 'medium') === 'medium')>Medium</option>
-                <option value="high" @selected(old('priority') === 'high')>High</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
               </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">Due Date</label>
-              <input id="editDueDate" type="date" name="due_date" class="form-control" value="{{ old('due_date') }}">
+              <input id="editDueDate" type="date" name="due_date" class="form-control">
             </div>
             <div class="col-md-4">
               <label class="form-label">Status</label>
               <select id="editStatus" name="status" class="form-select" required>
-                <option value="pending" @selected(old('status') === 'pending')>Pending</option>
-                <option value="done" @selected(old('status') === 'done')>Done</option>
+                <option value="pending">Pending</option>
+                <option value="done">Done</option>
               </select>
             </div>
           </div>
 
           <div class="mb-3">
             <label class="form-label">Notes</label>
-            <textarea id="editNotes" name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea>
+            <textarea id="editNotes" name="notes" class="form-control" rows="3"></textarea>
           </div>
 
           <div class="mb-0">
             <label class="form-label">Description</label>
-            <textarea id="editDescription" name="description" class="form-control" rows="3">{{ old('description') }}</textarea>
+            <textarea id="editDescription" name="description" class="form-control" rows="3"></textarea>
           </div>
         </div>
 
         <div class="modal-footer">
           <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
-          <button class="btn btn-primary" type="submit">Update</button>
+          <button class="btn btn-dark" type="submit">Update</button>
         </div>
       </form>
     </div>
@@ -343,87 +264,321 @@
 
 @push('scripts')
 <script>
-  document.querySelectorAll('.form-delete').forEach((form) => {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
+(() => {
+  const filtersForm = document.getElementById('filtersForm');
+  const tasksContent = document.getElementById('tasksContent');
+  const searchInput = document.getElementById('searchInput');
+  const statusFilter = document.getElementById('statusFilter');
+  const perPageFilter = document.getElementById('perPageFilter');
+  const clearBtn = document.getElementById('clearBtn');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+  const createModal = new bootstrap.Modal(document.getElementById('createModal'));
+  const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+  const tabRoot = document.getElementById('taskTabs');
 
-      Swal.fire({
+  const countNodes = {
+    all: document.getElementById('count-all'),
+    pending: document.getElementById('count-pending'),
+    done: document.getElementById('count-done'),
+  };
+
+  let searchDebounce;
+  let fetchController;
+
+  function formParams(overrides = {}) {
+    const params = new URLSearchParams(new FormData(filtersForm));
+    Object.entries(overrides).forEach(([k, v]) => {
+      if (v === null || v === undefined || v === '') {
+        params.delete(k);
+      } else {
+        params.set(k, v);
+      }
+    });
+    return params;
+  }
+
+  function setTab(tab) {
+    filtersForm.querySelector('input[name="tab"]').value = tab;
+    tabRoot.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+  }
+
+  function setLoading(state) {
+    loadingOverlay.classList.toggle('show', state);
+  }
+
+  async function fetchTasks({ pushState = true, page = null } = {}) {
+    const params = formParams({ page });
+
+    if (fetchController) {
+      fetchController.abort();
+    }
+    fetchController = new AbortController();
+
+    setLoading(true);
+
+    try {
+      const response = await fetch(`{{ route('tasks.data') }}?${params.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        signal: fetchController.signal,
+      });
+
+      if (!response.ok) {
+        showToast('Failed to load tasks.', 'error');
+        return;
+      }
+
+      const payload = await response.json();
+      tasksContent.innerHTML = payload.html;
+      countNodes.all.textContent = payload.counts.all;
+      countNodes.pending.textContent = payload.counts.pending;
+      countNodes.done.textContent = payload.counts.done;
+
+      if (pushState) {
+        const url = new URL(window.location.href);
+        url.search = params.toString();
+        window.history.pushState({}, '', url);
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        showToast('Network error.', 'error');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  window.reloadTasksData = () => fetchTasks({ pushState: false });
+
+  tabRoot.addEventListener('click', (event) => {
+    const target = event.target.closest('.tab-btn');
+    if (!target) return;
+    setTab(target.dataset.tab);
+    fetchTasks();
+  });
+
+  statusFilter.addEventListener('change', () => fetchTasks());
+  perPageFilter.addEventListener('change', () => fetchTasks());
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => fetchTasks(), 350);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    statusFilter.value = '';
+    perPageFilter.value = '10';
+    setTab('all');
+    fetchTasks();
+  });
+
+  filtersForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    fetchTasks();
+  });
+
+  tasksContent.addEventListener('click', async (event) => {
+    const pageLink = event.target.closest('#paginationWrapper a');
+    if (pageLink) {
+      event.preventDefault();
+      const page = new URL(pageLink.href).searchParams.get('page') || '1';
+      await fetchTasks({ page });
+      return;
+    }
+
+    const statusBtn = event.target.closest('.btn-ajax-status');
+    if (statusBtn) {
+      event.preventDefault();
+      await postForm(statusBtn.dataset.url, { status: statusBtn.dataset.status });
+      await fetchTasks({ pushState: false });
+      return;
+    }
+
+    const deleteBtn = event.target.closest('.btn-ajax-delete');
+    if (deleteBtn) {
+      event.preventDefault();
+      const result = await Swal.fire({
         title: 'Delete this task?',
         text: "You won't be able to undo this.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Yes, delete it',
-        cancelButtonText: 'Cancel',
-      }).then((result) => {
-        if (result.isConfirmed) {
-          form.submit();
-        }
       });
-    });
+
+      if (result.isConfirmed) {
+        await postForm(deleteBtn.dataset.url, { _method: 'DELETE' });
+        await fetchTasks({ pushState: false });
+      }
+      return;
+    }
+
+    const editBtn = event.target.closest('.btn-edit');
+    if (editBtn) {
+      document.getElementById('editTaskForm').action = editBtn.dataset.updateUrl;
+      document.getElementById('editTitle').value = editBtn.dataset.title;
+      document.getElementById('editDescription').value = editBtn.dataset.description;
+      document.getElementById('editNotes').value = editBtn.dataset.notes;
+      document.getElementById('editStatus').value = editBtn.dataset.status;
+      document.getElementById('editPriority').value = editBtn.dataset.priority;
+      document.getElementById('editDueDate').value = editBtn.dataset.dueDate;
+      document.getElementById('editErrors').classList.add('d-none');
+      return;
+    }
+
+    if (event.target.closest('#clearFiltersBtn')) {
+      clearBtn.click();
+    }
   });
 
-  const selectAll = document.getElementById('selectAll');
-  if (selectAll) {
-    selectAll.addEventListener('change', () => {
-      document.querySelectorAll('.task-checkbox').forEach((checkbox) => {
-        checkbox.checked = selectAll.checked;
+  tasksContent.addEventListener('change', async (event) => {
+    if (event.target.matches('#selectAll')) {
+      tasksContent.querySelectorAll('.task-checkbox').forEach((checkbox) => {
+        checkbox.checked = event.target.checked;
       });
-    });
-  }
+      return;
+    }
 
-  document.querySelectorAll('.quick-status-toggle').forEach((checkbox) => {
-    checkbox.addEventListener('change', (event) => {
-      const form = event.target.closest('form');
-      const hidden = form.querySelector('.status-value');
-      hidden.value = event.target.checked ? 'done' : 'pending';
-      form.submit();
-    });
+    if (event.target.matches('.quick-status-toggle')) {
+      const next = event.target.checked ? 'done' : 'pending';
+      await postForm(event.target.dataset.url, { _method: 'PATCH', status: next });
+      await fetchTasks({ pushState: false });
+    }
   });
 
-  document.querySelectorAll('.btn-edit').forEach((button) => {
-    button.addEventListener('click', () => {
-      const editForm = document.getElementById('editForm');
-      const updateUrl = button.dataset.updateUrl;
+  tasksContent.addEventListener('submit', async (event) => {
+    const bulkForm = event.target.closest('#bulkForm');
+    if (!bulkForm) return;
 
-      editForm.action = updateUrl;
-      document.getElementById('editUpdateUrl').value = updateUrl;
-      document.getElementById('editTaskId').value = button.dataset.id;
-      document.getElementById('editTitle').value = button.dataset.title;
-      document.getElementById('editDescription').value = button.dataset.description;
-      document.getElementById('editNotes').value = button.dataset.notes;
-      document.getElementById('editStatus').value = button.dataset.status;
-      document.getElementById('editPriority').value = button.dataset.priority;
-      document.getElementById('editDueDate').value = button.dataset.dueDate;
+    event.preventDefault();
+
+    const formData = new FormData(bulkForm);
+    if (!formData.getAll('task_ids[]').length) {
+      showToast('Select at least one task.', 'info');
+      return;
+    }
+
+    const response = await fetch(`{{ route('tasks.bulk-action') }}`, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData,
     });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      showToast(payload.message || 'Bulk action failed.', 'error');
+      return;
+    }
+
+    showToast(payload.message || 'Bulk action completed.');
+    await fetchTasks({ pushState: false });
   });
 
-  const filtersForm = document.getElementById('filtersForm');
-  const statusFilter = document.getElementById('statusFilter');
-  const perPageFilter = document.getElementById('perPageFilter');
-  const searchInput = document.getElementById('searchInput');
+  document.getElementById('createTaskForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const errorBox = document.getElementById('createErrors');
+    errorBox.classList.add('d-none');
 
-  if (statusFilter) {
-    statusFilter.addEventListener('change', () => filtersForm.submit());
-  }
-
-  if (perPageFilter) {
-    perPageFilter.addEventListener('change', () => filtersForm.submit());
-  }
-
-  let searchDebounce;
-  if (searchInput) {
-    searchInput.addEventListener('input', () => {
-      clearTimeout(searchDebounce);
-      searchDebounce = setTimeout(() => filtersForm.submit(), 450);
+    const response = await fetch(form.action, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: new FormData(form)
     });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (response.status === 422) {
+      errorBox.innerHTML = Object.values(payload.errors || {}).flat().map((e) => `<div>${e}</div>`).join('');
+      errorBox.classList.remove('d-none');
+      return;
+    }
+
+    if (!response.ok) {
+      showToast('Task creation failed.', 'error');
+      return;
+    }
+
+    form.reset();
+    createModal.hide();
+    showToast(payload.message || 'Task created.');
+    await fetchTasks({ pushState: false });
+  });
+
+  document.getElementById('editTaskForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const errorBox = document.getElementById('editErrors');
+    errorBox.classList.add('d-none');
+
+    const data = new FormData(form);
+    data.append('_method', 'PUT');
+
+    const response = await fetch(form.action, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: data
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (response.status === 422) {
+      errorBox.innerHTML = Object.values(payload.errors || {}).flat().map((e) => `<div>${e}</div>`).join('');
+      errorBox.classList.remove('d-none');
+      return;
+    }
+
+    if (!response.ok) {
+      showToast('Task update failed.', 'error');
+      return;
+    }
+
+    editModal.hide();
+    showToast(payload.message || 'Task updated.');
+    await fetchTasks({ pushState: false });
+  });
+
+  async function postForm(url, fields) {
+    const data = new FormData();
+    Object.entries(fields).forEach(([key, value]) => data.append(key, value));
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: data
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      showToast(payload.message || 'Action failed.', 'error');
+      return false;
+    }
+
+    showToast(payload.message || 'Updated.');
+    return true;
   }
-
-  @if($errors->any() && !old('edit_task_id'))
-    new bootstrap.Modal(document.getElementById('createModal')).show();
-  @endif
-
-  @if($errors->any() && old('edit_task_id'))
-    new bootstrap.Modal(document.getElementById('editModal')).show();
-  @endif
+})();
 </script>
 @endpush

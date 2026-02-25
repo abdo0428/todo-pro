@@ -20,8 +20,6 @@ class UpdateTaskRequest extends FormRequest
             'due_date' => ['nullable', 'date'],
             'priority' => ['required', 'in:low,medium,high'],
             'status' => ['required', 'in:pending,done'],
-            'edit_task_id' => ['nullable', 'integer'],
-            'edit_update_url' => ['nullable', 'string'],
         ];
     }
 }

@@ -6,54 +6,122 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
+# Todo Pro
 
-## About Laravel
+Todo Pro is a modern Laravel task management app with private user workspaces.
+Each user can register, log in, and manage only their own tasks using a fast AJAX-powered dashboard.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- User authentication
+  - Register, login, logout
+  - Account settings (profile update, password change, account delete)
+- Private task ownership
+  - Every task belongs to one user
+  - Users can only view and modify their own tasks
+- Task management
+  - Create, edit, delete, show details
+  - Status: `pending` / `done`
+  - Priority: `low` / `medium` / `high`
+  - Due date and notes
+- Productivity tools
+  - Search, filter, tabs, pagination
+  - Bulk actions (mark done / delete)
+  - Quick status toggle
+- AJAX dashboard UX
+  - Filtering and pagination without full page reload
+  - Inline updates and toast feedback
+- Demo data tools
+  - Seeder with sample users/tasks
+  - Sidebar quick fill button to generate test tasks
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Tech Stack
 
-## Learning Laravel
+- Laravel (PHP)
+- Blade templates
+- Bootstrap 5
+- Vanilla JavaScript (AJAX + DOM updates)
+- SQLite (default local setup)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Project Structure (Key Files)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- Routes: `routes/web.php`
+- Controllers:
+  - `app/Http/Controllers/TaskController.php`
+  - `app/Http/Controllers/AuthController.php`
+  - `app/Http/Controllers/AccountController.php`
+- Models:
+  - `app/Models/User.php`
+  - `app/Models/Task.php`
+- Views:
+  - `resources/views/welcome.blade.php`
+  - `resources/views/tasks/index.blade.php`
+  - `resources/views/tasks/partials/table.blade.php`
+  - `resources/views/layouts/app.blade.php`
 
-## Laravel Sponsors
+## Installation
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+1. Clone the project
+2. Install dependencies
 
-### Premium Partners
+```bash
+composer install
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+3. Create environment file
 
-## Contributing
+```bash
+cp .env.example .env
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+4. Generate app key
 
-## Code of Conduct
+```bash
+php artisan key:generate
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+5. Run migrations
 
-## Security Vulnerabilities
+```bash
+php artisan migrate
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+6. Seed demo data (optional but recommended)
+
+```bash
+php artisan db:seed
+```
+
+7. Start the app
+
+```bash
+php artisan serve
+```
+
+Open: `http://127.0.0.1:8000`
+
+## Demo Account
+
+After seeding:
+
+- Email: `demo@todopro.test`
+- Password: `password123`
+
+## Testing
+
+Run tests with:
+
+```bash
+php artisan test
+```
+
+## Notes
+
+- AJAX endpoints are protected by `auth` middleware.
+- Task isolation is enforced at controller level and database relationship level.
+- If you change database settings, update `.env` before running migrations/seeds.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is open-source and available under the MIT license.
+

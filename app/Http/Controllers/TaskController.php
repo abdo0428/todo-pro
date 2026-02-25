@@ -133,4 +133,5 @@ class TaskController extends Controller
 
         return compact('tasks', 'q', 'status', 'tab', 'perPage', 'counts');
     }
+    
 }

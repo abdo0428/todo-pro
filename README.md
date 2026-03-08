@@ -116,3 +116,5 @@ php artisan test
 ## License
 
 This project is open-source and available under the MIT license.
+
+## THE END
